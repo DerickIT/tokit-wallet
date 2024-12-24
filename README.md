@@ -21,6 +21,11 @@ Before using the wallet, you need to set the following environment variables. Yo
 *   `ARBITRUM_RPC_URL`: RPC URL for the Arbitrum network.
 *   `OPTIMISM_RPC_URL`: RPC URL for the Optimism network.
 *   `BASE_RPC_URL`: RPC URL for the Base network.
+*   `WALLET_SEED`: The seed phrase for generating wallet keys. **Important:** Keep this secure and do not share it.
+*   `ETHEREUM_CHAIN_NAME`: The name used to identify the Ethereum chain (e.g., "ethereum").
+*   `ARBITRUM_CHAIN_NAME`: The name used to identify the Arbitrum chain (e.g., "arbitrum").
+*   `OPTIMISM_CHAIN_NAME`: The name used to identify the Optimism chain (e.g., "optimism").
+*   `BASE_CHAIN_NAME`: The name used to identify the Base chain (e.g., "base").
 
 ### Commands
 

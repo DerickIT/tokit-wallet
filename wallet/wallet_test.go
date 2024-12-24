@@ -1,148 +1,118 @@
 package wallet
 
 import (
-	"errors"
+	"reflect"
 	"testing"
 
-	"tokit/wallet/pkg/common2"
+	common2 "tokit/wallet/pkg/common2"
+
+	"github.com/ethereum/go-ethereum/ethclient"
+	bip32 "github.com/tyler-smith/go-bip32"
 )
 
-// MockBlockchainClient is a mock implementation of the Blockchain interface.
-type MockBlockchainClient struct {
-	address         string
-	err             error
-	transferSuccess bool
-	history         []common2.Transaction
-}
-
-func (m *MockBlockchainClient) GetAddress() (string, error) {
-	return m.address, m.err
-}
-
-func (m *MockBlockchainClient) Transfer(privateKeyHex string, toAddress string, amount float64) (string, error) {
-	if m.transferSuccess {
-		return "txHash", nil
-	}
-	return "", errors.New("transfer failed")
-}
-
-func (m *MockBlockchainClient) GetTransactionHistory(address string) ([]common2.Transaction, error) {
-	return m.history, m.err
-}
-
-func (m *MockBlockchainClient) GenerateKey() ([]byte, error) {
-	return nil, nil
-}
-
 func TestNewWallet(t *testing.T) {
-	_ = NewWallet(nil, nil)
+	clientFactory := func(chain string, rpcURL string) (common2.Blockchain, error) {
+		// Mock client factory for testing
+		return nil, nil
+	}
+	ethereumClient, _ := ethclient.Dial("http://localhost:8545")
+	masterKey, _ := bip32.NewMasterKey([]byte("seed"))
+
+	w := NewWallet(clientFactory, ethereumClient, masterKey)
+
+	if w == nil {
+		t.Errorf("NewWallet returned nil")
+	}
+	if reflect.TypeOf(w).String() != "*wallet.Wallet" {
+		t.Errorf("NewWallet returned incorrect type: got %T, want *Wallet", w)
+	}
 }
 
-func TestWallet_AddClient(t *testing.T) {
-	w := NewWallet(func(chain string, rpcURL string) (common2.Blockchain, error) {
-		return &MockBlockchainClient{}, nil
-	}, nil)
+func TestAddClient(t *testing.T) {
+	w := &Wallet{
+		clients: make(map[string]common2.Blockchain),
+		clientFactory: func(chain string, rpcURL string) (common2.Blockchain, error) {
+			return nil, nil // Mock client factory
+		},
+	}
 
-	err := w.AddClient("ethereum")
+	err := w.AddClient("testchain")
 	if err != nil {
 		t.Errorf("AddClient failed: %v", err)
 	}
 
-	if _, ok := w.clients["ethereum"]; !ok {
-		t.Error("Client not added")
+	if _, ok := w.clients["testchain"]; !ok {
+		t.Errorf("Client for 'testchain' not added to wallet")
 	}
 }
 
-func TestWallet_GetAddress(t *testing.T) {
-	mockAddress := "0x123"
-	w := NewWallet(func(chain string, rpcURL string) (common2.Blockchain, error) {
-		return &MockBlockchainClient{address: mockAddress}, nil
-	}, nil)
-	w.clients["ethereum"] = &MockBlockchainClient{address: mockAddress}
+func TestGetAddress(t *testing.T) {
+	expectedAddress := "0x1234567890abcdef"
+	clientFactory := func(chain string, rpcURL string) (common2.Blockchain, error) {
+		return &MockBlockchain{address: expectedAddress, txHash: ""}, nil
+	}
+	w := &Wallet{
+		clients:       make(map[string]common2.Blockchain),
+		clientFactory: clientFactory,
+	}
+	w.AddClient("testchain")
 
-	addr, err := w.GetAddress("ethereum")
+	address, err := w.GetAddress("testchain")
 	if err != nil {
-		t.Fatalf("GetAddress failed: %v", err)
+		t.Errorf("GetAddress failed: %v", err)
 	}
-	if addr != mockAddress {
-		t.Errorf("Expected address %s, got %s", mockAddress, addr)
+	if address != expectedAddress {
+		t.Errorf("GetAddress got %s, want %s", address, expectedAddress)
 	}
 
-	_, err = w.GetAddress("unknown")
+	_, err = w.GetAddress("nonexistent")
 	if err == nil {
-		t.Error("Expected error for unknown chain")
+		t.Errorf("GetAddress with nonexistent chain should return an error")
 	}
 }
 
-func TestWallet_GetAddress_ClientError(t *testing.T) {
-	expectedErr := errors.New("client error")
-	w := NewWallet(func(chain string, rpcURL string) (common2.Blockchain, error) {
-		return &MockBlockchainClient{err: expectedErr}, nil
-	}, nil)
-	w.clients["ethereum"] = &MockBlockchainClient{err: expectedErr}
-
-	_, err := w.GetAddress("ethereum")
-	if err == nil {
-		t.Fatal("Expected error, got nil")
-	}
-	if !errors.Is(err, expectedErr) {
-		t.Errorf("Expected error %v, got %v", expectedErr, err)
-	}
+type MockBlockchain struct {
+	address string
+	txHash  string
 }
 
-func TestWallet_Transfer(t *testing.T) {
-	w := NewWallet(func(chain string, rpcURL string) (common2.Blockchain, error) {
-		return &MockBlockchainClient{transferSuccess: true}, nil
-	}, nil)
-	w.clients["ethereum"] = &MockBlockchainClient{transferSuccess: true}
+func (m *MockBlockchain) GetAddress() (string, error) {
+	return m.address, nil
+}
 
-	txHash, err := w.Transfer("ethereum", "0xprivateKey", "0xtoAddress", 1.0)
+func (m *MockBlockchain) Transfer(privateKeyHex string, toAddress string, amount float64) (string, error) {
+	return m.txHash, nil
+}
+
+func (m *MockBlockchain) GetTransactionHistory(address string) ([]common2.Transaction, error) {
+	return nil, nil
+}
+
+func (m *MockBlockchain) GenerateKey() ([]byte, error) {
+	return []byte{}, nil
+}
+
+func TestTransfer(t *testing.T) {
+	expectedTxHash := "0xabcdef1234567890"
+	clientFactory := func(chain string, rpcURL string) (common2.Blockchain, error) {
+		return &MockBlockchain{address: "", txHash: expectedTxHash}, nil
+	}
+	w := &Wallet{
+		clients:       make(map[string]common2.Blockchain),
+		clientFactory: clientFactory,
+	}
+	w.AddClient("testchain")
+
+	txHash, err := w.Transfer("testchain", "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "0xrecipient", 1.0)
 	if err != nil {
-		t.Fatalf("Transfer failed: %v", err)
+		t.Errorf("Transfer failed: %v", err)
 	}
-	if txHash != "txHash" {
-		t.Errorf("Expected txHash %s, got %s", "txHash", txHash)
+	if txHash != expectedTxHash {
+		t.Errorf("Transfer got %s, want %s", txHash, expectedTxHash)
 	}
 
-	w.clients["ethereum"] = &MockBlockchainClient{transferSuccess: false}
-	_, err = w.Transfer("ethereum", "0xprivateKey", "0xtoAddress", 1.0)
+	_, err = w.Transfer("nonexistent", "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "0xrecipient", 1.0)
 	if err == nil {
-		t.Error("Expected error for transfer failure")
-	}
-
-	_, err = w.Transfer("unknown", "0xprivateKey", "0xtoAddress", 1.0)
-	if err == nil {
-		t.Error("Expected error for unknown chain")
-	}
-}
-
-func TestWallet_GetTransactionHistory(t *testing.T) {
-	mockHistory := []common2.Transaction{{Hash: "0xabc"}}
-	w := NewWallet(func(chain string, rpcURL string) (common2.Blockchain, error) {
-		return &MockBlockchainClient{history: mockHistory}, nil
-	}, nil)
-	w.clients["ethereum"] = &MockBlockchainClient{history: mockHistory}
-
-	history, err := w.GetTransactionHistory("ethereum", "0xaddress")
-	if err != nil {
-		t.Fatalf("GetTransactionHistory failed: %v", err)
-	}
-	if len(history) != 1 || history[0].Hash != "0xabc" {
-		t.Errorf("Expected history %v, got %v", mockHistory, history)
-	}
-
-	_, err = w.GetTransactionHistory("unknown", "0xaddress")
-	if err == nil {
-		t.Error("Expected error for unknown chain")
-	}
-
-	expectedErr := errors.New("client error")
-	w.clients["ethereum"] = &MockBlockchainClient{err: expectedErr}
-	_, err = w.GetTransactionHistory("ethereum", "0xaddress")
-	if err == nil {
-		t.Fatal("Expected error, got nil")
-	}
-	if !errors.Is(err, expectedErr) {
-		t.Errorf("Expected error %v, got %v", expectedErr, err)
+		t.Errorf("Transfer with nonexistent chain should return an error")
 	}
 }

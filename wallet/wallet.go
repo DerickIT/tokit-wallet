@@ -15,21 +15,26 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rlp"
+	bip32 "github.com/tyler-smith/go-bip32"
 )
+
+const defaultRPCURL = "http://localhost:8545"
 
 // Wallet manages multiple blockchain clients.
 type Wallet struct {
 	clients        map[string]common2.Blockchain
 	clientFactory  func(chain string, rpcURL string) (common2.Blockchain, error)
 	ethereumClient *ethclient.Client
+	masterKey      *bip32.Key // Add master key
 }
 
 // NewWallet creates a new wallet with the given client factory.
-func NewWallet(clientFactory func(chain string, rpcURL string) (common2.Blockchain, error), ethereumClient *ethclient.Client) *Wallet {
+func NewWallet(clientFactory func(chain string, rpcURL string) (common2.Blockchain, error), ethereumClient *ethclient.Client, masterKey *bip32.Key) *Wallet {
 	return &Wallet{
 		clients:        make(map[string]common2.Blockchain),
 		clientFactory:  clientFactory,
 		ethereumClient: ethereumClient,
+		masterKey:      masterKey, // Initialize master key
 	}
 }
 
@@ -37,7 +42,7 @@ func NewWallet(clientFactory func(chain string, rpcURL string) (common2.Blockcha
 func (w *Wallet) AddClient(chain string) error {
 	rpcURL := os.Getenv(chain + "_RPC_URL")
 	if rpcURL == "" {
-		rpcURL = "http://localhost:8545" // Default if not set
+		rpcURL = defaultRPCURL // Use the constant here
 	}
 	client, err := w.clientFactory(chain, rpcURL)
 	if err != nil {

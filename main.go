@@ -7,15 +7,15 @@ import (
 	"tokit/wallet/pkg/blockchain/evm"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/tyler-smith/go-bip32"
 )
 
 func main() {
 	// Initialize wallet factory (for EVM chains)
+	const defaultRPCURL = "http://localhost:8545"
 	rpcURL := os.Getenv("RPC_URL")
 	if rpcURL == "" {
-		const defaultRPCURL = "http://localhost:8545"
-		// Consider logging a warning here
-		fmt.Println("Warning: RPC_URL environment variable not set. Using default.")
+		fmt.Println("Warning: RPC_URL environment variable not set. Using default:", defaultRPCURL)
 		rpcURL = defaultRPCURL
 	}
 
@@ -25,14 +25,36 @@ func main() {
 		panic(err)
 	}
 
+	// Get wallet seed from environment variable
+	seedPhrase := os.Getenv("WALLET_SEED")
+	if seedPhrase == "" {
+		panic("WALLET_SEED environment variable not set")
+	}
+	seed := []byte(seedPhrase)
+	masterKey, err := bip32.NewMasterKey(seed)
+	if err != nil {
+		panic(err)
+	}
+
 	// Create wallet
-	myWallet := wallet.NewWallet(evm.Create, client)
-	const (
-		ethereumChain = "ethereum"
-		arbitrumChain = "arbitrum"
-		optimismChain = "optimism"
-		baseChain     = "base"
-	)
+	myWallet := wallet.NewWallet(evm.Create, client, masterKey)
+
+	ethereumChain := os.Getenv("ETHEREUM_CHAIN_NAME")
+	if ethereumChain == "" {
+		panic("ETHEREUM_CHAIN_NAME environment variable not set")
+	}
+	arbitrumChain := os.Getenv("ARBITRUM_CHAIN_NAME")
+	if arbitrumChain == "" {
+		panic("ARBITRUM_CHAIN_NAME environment variable not set")
+	}
+	optimismChain := os.Getenv("OPTIMISM_CHAIN_NAME")
+	if optimismChain == "" {
+		panic("OPTIMISM_CHAIN_NAME environment variable not set")
+	}
+	baseChain := os.Getenv("BASE_CHAIN_NAME")
+	if baseChain == "" {
+		panic("BASE_CHAIN_NAME environment variable not set")
+	}
 
 	err = myWallet.AddClient(ethereumChain)
 	if err != nil {
