@@ -1,2 +1,33 @@
+# Binaries for programs and plugins
 *.exe
-*.env
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go build command
+[Pp]rogram
+
+# Go workspace (https://golang.org/doc/go1.5#workspaces)
+# Directories
+bin/
+pkg/
+vendor/
+
+# IDEs
+.idea/
+.vscode/
+
+# OS or Env specific files
+.DS_Store
+*.swp
+*.swo
+
+# Temporary files
+*~
+\#*
+
+# Built web assets
+public/build/
