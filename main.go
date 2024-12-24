@@ -11,9 +11,12 @@ import (
 
 func main() {
 	// Initialize wallet factory (for EVM chains)
-	rpcURL := os.Getenv("RPC_URL") // You might want to use different RPC URLs for different chains
+	rpcURL := os.Getenv("RPC_URL")
 	if rpcURL == "" {
-		rpcURL = "http://localhost:8545" // Default if not set
+		const defaultRPCURL = "http://localhost:8545"
+		// Consider logging a warning here
+		fmt.Println("Warning: RPC_URL environment variable not set. Using default.")
+		rpcURL = defaultRPCURL
 	}
 
 	// Create Ethereum client
@@ -24,45 +27,40 @@ func main() {
 
 	// Create wallet
 	myWallet := wallet.NewWallet(evm.Create, client)
-	err = myWallet.AddClient("ethereum")
+	const (
+		ethereumChain = "ethereum"
+		arbitrumChain = "arbitrum"
+		optimismChain = "optimism"
+		baseChain     = "base"
+	)
+
+	err = myWallet.AddClient(ethereumChain)
 	if err != nil {
 		panic(err)
 	}
-	err = myWallet.AddClient("arbitrum")
+	err = myWallet.AddClient(arbitrumChain)
 	if err != nil {
 		panic(err)
 	}
-	err = myWallet.AddClient("optimism")
+	err = myWallet.AddClient(optimismChain)
 	if err != nil {
 		panic(err)
 	}
-	err = myWallet.AddClient("base")
+	err = myWallet.AddClient(baseChain)
 	if err != nil {
 		panic(err)
 	}
 
 	// Get Ethereum address
-	ethAddress, err := myWallet.GetAddress("ethereum")
+	ethAddress, err := myWallet.GetAddress(ethereumChain)
 	if err != nil {
 		fmt.Println("Error getting Ethereum address:", err)
 	} else {
 		fmt.Println("Ethereum Address:", ethAddress)
 	}
 
-	// Transfer funds (example)
-	privateKey := "your_private_key_here" // Replace with an actual private key
-	toAddress := "recipient_address_here" // Replace with a recipient address
-	amount := 0.01
-
-	txHash, err := myWallet.Transfer("ethereum", privateKey, toAddress, amount)
-	if err != nil {
-		fmt.Println("Error transferring funds:", err)
-	} else {
-		fmt.Println("Transaction Hash:", txHash)
-	}
-
 	// Get transaction history (example)
-	history, err := myWallet.GetTransactionHistory("ethereum", ethAddress)
+	history, err := myWallet.GetTransactionHistory(ethereumChain, ethAddress)
 	if err != nil {
 		fmt.Println("Error getting transaction history:", err)
 	} else {

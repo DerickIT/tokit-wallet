@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"os"
 
 	common2 "tokit/wallet/pkg/common2"
 
@@ -34,7 +35,10 @@ func NewWallet(clientFactory func(chain string, rpcURL string) (common2.Blockcha
 
 // AddClient adds a new blockchain client to the wallet.
 func (w *Wallet) AddClient(chain string) error {
-	rpcURL := "http://localhost:8545" //todo: get from config
+	rpcURL := os.Getenv(chain + "_RPC_URL")
+	if rpcURL == "" {
+		rpcURL = "http://localhost:8545" // Default if not set
+	}
 	client, err := w.clientFactory(chain, rpcURL)
 	if err != nil {
 		return fmt.Errorf("failed to create client for %s: %w", chain, err)
@@ -70,8 +74,8 @@ func (w *Wallet) GetTransactionHistory(chain string, address string) ([]common2.
 	return client.GetTransactionHistory(address)
 }
 
-func (w *Wallet) deriveChildKey(chain string) (*ecdsa.PrivateKey, error) {
-	// Placeholder implementation - replace with actual key derivation logic
+func (w *Wallet) deriveChildKey() (*ecdsa.PrivateKey, error) {
+	// TODO: Implement actual key derivation logic based on the chain.
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		return nil, err
@@ -81,11 +85,12 @@ func (w *Wallet) deriveChildKey(chain string) (*ecdsa.PrivateKey, error) {
 
 // SignTransaction signs an Ethereum transaction.
 func (w *Wallet) SignTransaction(chain string, toAddress string, amount *big.Int) (*types.Transaction, error) {
-	if chain != "ethereum" {
+	const ethereumChain = "ethereum"
+	if chain != ethereumChain {
 		return nil, fmt.Errorf("signing transaction is only supported for Ethereum")
 	}
 
-	privateKey, err := w.deriveChildKey("ethereum")
+	privateKey, err := w.deriveChildKey()
 	if err != nil {
 		return nil, err
 	}

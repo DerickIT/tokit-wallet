@@ -31,3 +31,4 @@ vendor/
 
 # Built web assets
 public/build/
+.env
