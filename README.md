@@ -1,64 +1,108 @@
-# Decentralized Wallet
+# Tokit Wallet
 
-This is a command-line decentralized wallet that supports multiple EVM-compatible blockchains, including Ethereum, Arbitrum, Optimism, and Base, as well as Bitcoin and EOS.
+A secure, modular, and feature-rich CLI wallet for EVM-compatible blockchains.
 
 ## Features
 
-*   **Multi-Chain Support:** Supports Ethereum, Arbitrum, Optimism, Base, Bitcoin, and EOS.
-*   **Address Generation:** Generates new addresses for supported blockchains.
-*   ** फंड Transfer:** Allows transferring funds on EVM-compatible chains.
-*   **Transaction History:** Retrieves transaction history for specified addresses on EVM-compatible chains.
+*   **🔐 Secure Key Management**:
+    *   Uses `go-ethereum/accounts/keystore` (Scrypt N/P) for encrypted key storage.
+    *   BIP39 Mnemonic generation and import (12/24 words).
+    *   BIP44 HD Key Derivation (`m/44'/60'/0'/0/0`).
+    *   Interactive password prompts (no passwords in history).
+
+*   **⛓️ Multi-Chain Support**:
+    *   Pre-configured for Ethereum, Arbitrum, Optimism, and Base.
+    *   Easily extensible via `~/.tokit/config.yaml`.
+    *   Supports any EVM-compatible network.
+
+*   **💸 Transaction Management**:
+    *   **EIP-1559** support (Dynamic Fee Transactions).
+    *   **Smart Gas Estimation** for accurate fee calculation.
+    *   **ERC20 Token Support**: Transfer and check balances of any ERC20 token.
+    *   Secure signing with local keystore.
+
+*   **🛠️ Developer Friendly**:
+    *   Built with `Cobra` for a robust CLI experience.
+    *   Configuration management via `Viper`.
+    *   Structured logging and error handling.
+
+## Installation
+
+```bash
+go build -o tokit.exe main.go
+```
 
 ## Usage
 
-The wallet is controlled through command-line arguments.
+### 1. Wallet Management
 
-### Environment Setup
+**Create a new wallet:**
+```bash
+./tokit wallet create
+```
+*Generates a new BIP39 mnemonic and imports the first account.*
 
-Before using the wallet, you need to set the following environment variables. You can copy the `.env.template` file, rename it to `.env`, and replace the placeholders with your actual values:
+**Import an existing wallet:**
+```bash
+./tokit wallet import
+```
+*Supports importing via Mnemonic phrase or Private Key (hex).*
 
-*   `ETHEREUM_RPC_URL`: RPC URL for the Ethereum network.
-*   `ARBITRUM_RPC_URL`: RPC URL for the Arbitrum network.
-*   `OPTIMISM_RPC_URL`: RPC URL for the Optimism network.
-*   `BASE_RPC_URL`: RPC URL for the Base network.
-*   `WALLET_SEED`: The seed phrase for generating wallet keys. **Important:** Keep this secure and do not share it.
-*   `ETHEREUM_CHAIN_NAME`: The name used to identify the Ethereum chain (e.g., "ethereum").
-*   `ARBITRUM_CHAIN_NAME`: The name used to identify the Arbitrum chain (e.g., "arbitrum").
-*   `OPTIMISM_CHAIN_NAME`: The name used to identify the Optimism chain (e.g., "optimism").
-*   `BASE_CHAIN_NAME`: The name used to identify the Base chain (e.g., "base").
+**List accounts:**
+```bash
+./tokit wallet list
+```
 
-### Commands
+### 2. Balance Check
 
-*   `address <chain>`: Retrieves the address for the specified blockchain.
-    *   Example: `tokit address ethereum`
-    *   Supported chains: `ethereum`, `arbitrum`, `optimism`, `base`, `bitcoin`, `eos`
+**Check ETH balance:**
+```bash
+./tokit balance ethereum [address]
+```
+*If address is omitted, checks the first local account.*
 
-*   `transfer <chain> <to_address> <amount>`: Initiates a transfer on the specified blockchain.
-    *   Example: `tokit transfer ethereum 0x1234abcd 1.0`
-    *   Parameters:
-        *   `<chain>`: The blockchain to perform the transfer on (`ethereum`, `arbitrum`, `optimism`, `base`).
-        *   `<to_address>`: The recipient's address.
-        *   `<amount>`: The transfer amount.
+**Check ERC20 Token balance:**
+```bash
+./tokit balance ethereum --token 0xdac17f958d2ee523a2206206994597c13d831ec7
+```
 
-*   `history <chain> <address>`: Retrieves the transaction history for the specified blockchain and address.
-    *   Example: `tokit history ethereum 0x1234abcd`
-    *   Parameters:
-        *   `<chain>`: The blockchain to query the transaction history from (`ethereum`, `arbitrum`, `optimism`, `base`).
-        *   `<address>`: The address to query the transaction history for.
+### 3. Transfer Funds
 
-### Supported Chains
+**Send ETH:**
+```bash
+./tokit transfer ethereum 0xRecipientAddress 0.1
+```
 
-*   Ethereum
-*   Arbitrum
-*   Optimism
-*   Base
-*   Bitcoin (address generation only)
-*   EOS (address generation only)
+**Send ERC20 Tokens:**
+```bash
+./tokit transfer ethereum 0xRecipientAddress 100 --token 0xdac17f958d2ee523a2206206994597c13d831ec7
+```
 
-### Important Notes
+## Configuration
 
-*   This is a basic implementation and does not include secure key management or transaction signing functionalities.
-*   RPC URLs are read from environment variables. Ensure these are correctly configured before running the wallet.
-*   The wallet generates a new key pair for each address request. In a real-world scenario, key management would be handled more securely.
-*   The wallet uses a mnemonic phrase to generate a master private key and then uses Hierarchical Deterministic (HD) paths to derive child private keys for each chain. This implementation uses a placeholder for key derivation and should be replaced with secure key generation and management practices for production use.
-*   The `transfer` and `history` commands are only supported for EVM-compatible chains (Ethereum, Arbitrum, Optimism, Base).
+The wallet uses a configuration file located at `~/.tokit/config.yaml`.
+
+```yaml
+default: ethereum
+networks:
+  ethereum:
+    rpc: https://eth.llamarpc.com
+    chain_id: 1
+    symbol: ETH
+    explorer: https://etherscan.io
+  arbitrum:
+    rpc: https://arb1.arbitrum.io/rpc
+    chain_id: 42161
+    symbol: ETH
+    explorer: https://arbiscan.io
+```
+
+## Security
+
+*   **Private Keys**: Stored in `~/.tokit/keystore` as encrypted JSON files.
+*   **Passwords**: Never stored, only requested interactively for signing.
+*   **Mnemonics**: Only displayed once during creation.
+
+## License
+
+MIT
