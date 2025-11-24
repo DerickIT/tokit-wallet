@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var balanceTokenAddress string
+
 var balanceCmd = &cobra.Command{
 	Use:   "balance [chain] [address]",
 	Short: "Check account balance",
@@ -45,12 +47,26 @@ var balanceCmd = &cobra.Command{
 		}
 		defer client.Close()
 
-		balance, err := client.GetBalance(address)
-		if err != nil {
-			utils.Log.Fatalf("Failed to get balance: %v", err)
+		var balance *big.Int
+		var symbol string
+
+		if balanceTokenAddress != "" {
+			// Check Token Balance
+			balance, err = client.GetTokenBalance(balanceTokenAddress, address)
+			if err != nil {
+				utils.Log.Fatalf("Failed to get token balance: %v", err)
+			}
+			symbol = "TOKEN" // TODO: Fetch symbol from contract
+		} else {
+			// Check ETH Balance
+			balance, err = client.GetBalance(address)
+			if err != nil {
+				utils.Log.Fatalf("Failed to get balance: %v", err)
+			}
+			symbol = client.Config.Symbol
 		}
 
-		// Convert Wei to Ether
+		// Convert Wei to Ether (assuming 18 decimals)
 		fBalance := new(big.Float)
 		fBalance.SetString(balance.String())
 		ethValue := new(big.Float).Quo(fBalance, big.NewFloat(1e18))
@@ -58,11 +74,12 @@ var balanceCmd = &cobra.Command{
 		w := new(tabwriter.Writer)
 		w.Init(os.Stdout, 0, 8, 2, '\t', 0)
 		fmt.Fprintln(w, "Chain\tAddress\tBalance\tSymbol")
-		fmt.Fprintf(w, "%s\t%s\t%.6f\t%s\n", chainName, address, ethValue, client.Config.Symbol)
+		fmt.Fprintf(w, "%s\t%s\t%.6f\t%s\n", chainName, address, ethValue, symbol)
 		w.Flush()
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(balanceCmd)
+	balanceCmd.Flags().StringVarP(&balanceTokenAddress, "token", "t", "", "ERC20 token address")
 }

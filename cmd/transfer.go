@@ -16,6 +16,8 @@ import (
 	"golang.org/x/term"
 )
 
+var transferTokenAddress string
+
 var transferCmd = &cobra.Command{
 	Use:   "transfer [chain] [to] [amount]",
 	Short: "Transfer funds to another address",
@@ -52,12 +54,20 @@ var transferCmd = &cobra.Command{
 		}
 		defer client.Close()
 
+		symbol := client.Config.Symbol
+		if transferTokenAddress != "" {
+			symbol = "TOKEN"
+		}
+
 		// Confirm Transaction
 		fmt.Printf("\n⚠️  CONFIRM TRANSACTION\n")
 		fmt.Printf("Chain:  %s\n", chainName)
 		fmt.Printf("From:   %s\n", fromAccount.Address.Hex())
 		fmt.Printf("To:     %s\n", toAddress)
-		fmt.Printf("Amount: %s %s\n", amountStr, client.Config.Symbol)
+		fmt.Printf("Amount: %s %s\n", amountStr, symbol)
+		if transferTokenAddress != "" {
+			fmt.Printf("Token:  %s\n", transferTokenAddress)
+		}
 		fmt.Println(strings.Repeat("-", 40))
 
 		fmt.Print("Enter password to confirm: ")
@@ -75,7 +85,13 @@ var transferCmd = &cobra.Command{
 
 		// Send Transaction
 		fmt.Println("\nSending transaction...")
-		txHash, err := client.SendTransaction(fromAccount, toAddress, amount, signFn)
+		var txHash string
+		if transferTokenAddress != "" {
+			txHash, err = client.SendTokenTransaction(fromAccount, transferTokenAddress, toAddress, amount, signFn)
+		} else {
+			txHash, err = client.SendTransaction(fromAccount, toAddress, amount, signFn)
+		}
+
 		if err != nil {
 			utils.Log.Fatalf("Failed to send transaction: %v", err)
 		}
@@ -87,4 +103,5 @@ var transferCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(transferCmd)
+	transferCmd.Flags().StringVarP(&transferTokenAddress, "token", "t", "", "ERC20 token address")
 }
