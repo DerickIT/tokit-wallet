@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-
+	"text/tabwriter"
 	"tokit/internal/chain"
 	"tokit/internal/utils"
 	"tokit/internal/wallet"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -56,16 +55,11 @@ var balanceCmd = &cobra.Command{
 		fBalance.SetString(balance.String())
 		ethValue := new(big.Float).Quo(fBalance, big.NewFloat(1e18))
 
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Chain", "Address", "Balance", "Symbol"})
-		table.SetBorder(false)
-		table.Append([]string{
-			chainName,
-			address,
-			fmt.Sprintf("%.6f", ethValue),
-			client.Config.Symbol,
-		})
-		table.Render()
+		w := new(tabwriter.Writer)
+		w.Init(os.Stdout, 0, 8, 2, '\t', 0)
+		fmt.Fprintln(w, "Chain\tAddress\tBalance\tSymbol")
+		fmt.Fprintf(w, "%s\t%s\t%.6f\t%s\n", chainName, address, ethValue, client.Config.Symbol)
+		w.Flush()
 	},
 }
 

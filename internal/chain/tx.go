@@ -49,11 +49,11 @@ func (c *Client) SendTransaction(
 
 	// 6. Estimate Gas Limit
 	toAddr := common.HexToAddress(to)
-	msg := map[string]interface{}{
-		"from":  from.Address,
-		"to":    toAddr,
-		"value": weiValue,
-	}
+	// msg := map[string]interface{}{
+	// 	"from":  from.Address,
+	// 	"to":    toAddr,
+	// 	"value": weiValue,
+	// }
 	// Note: EstimateGas requires CallMsg, but here we construct it implicitly or use client.EstimateGas
 	// Let's use the proper CallMsg struct
 	// We need to import "github.com/ethereum/go-ethereum" for CallMsg but it's in interfaces
