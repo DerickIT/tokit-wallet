@@ -34,6 +34,9 @@ func mustParseABI(definition string) abi.ABI {
 
 // GetTokenMetadata returns basic ERC20 metadata used for balances and transfers.
 func (c *Client) GetTokenMetadata(tokenAddress string) (*TokenMetadata, error) {
+	if !common.IsHexAddress(tokenAddress) {
+		return nil, fmt.Errorf("invalid token address: %s", tokenAddress)
+	}
 	tokenAddr := common.HexToAddress(tokenAddress)
 
 	symbolValues, err := c.callERC20(tokenAddr, "symbol")
@@ -59,6 +62,12 @@ func (c *Client) GetTokenMetadata(tokenAddress string) (*TokenMetadata, error) {
 
 // GetTokenBalance returns the balance of an ERC20 token.
 func (c *Client) GetTokenBalance(tokenAddress, ownerAddress string) (*big.Int, error) {
+	if !common.IsHexAddress(tokenAddress) {
+		return nil, fmt.Errorf("invalid token address: %s", tokenAddress)
+	}
+	if !common.IsHexAddress(ownerAddress) {
+		return nil, fmt.Errorf("invalid owner address: %s", ownerAddress)
+	}
 	tokenAddr := common.HexToAddress(tokenAddress)
 	ownerAddr := common.HexToAddress(ownerAddress)
 
@@ -77,6 +86,12 @@ func (c *Client) GetTokenBalance(tokenAddress, ownerAddress string) (*big.Int, e
 
 // PrepareTokenTransfer builds an unsigned ERC20 transfer transaction.
 func (c *Client) PrepareTokenTransfer(from common.Address, tokenAddress string, to string, amountBaseUnits *big.Int) (*types.Transaction, error) {
+	if !common.IsHexAddress(tokenAddress) {
+		return nil, fmt.Errorf("invalid token address: %s", tokenAddress)
+	}
+	if !common.IsHexAddress(to) {
+		return nil, fmt.Errorf("invalid recipient address: %s", to)
+	}
 	tokenAddr := common.HexToAddress(tokenAddress)
 	toAddr := common.HexToAddress(to)
 

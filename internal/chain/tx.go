@@ -12,6 +12,9 @@ import (
 
 // PrepareNativeTransfer builds an unsigned EIP-1559 transfer transaction.
 func (c *Client) PrepareNativeTransfer(from common.Address, to string, amountWei *big.Int) (*types.Transaction, error) {
+	if !common.IsHexAddress(to) {
+		return nil, fmt.Errorf("invalid recipient address: %s", to)
+	}
 	toAddr := common.HexToAddress(to)
 	return c.prepareDynamicFeeTx(from, toAddr, amountWei, nil, 21000)
 }
