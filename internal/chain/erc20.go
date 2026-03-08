@@ -1,13 +1,11 @@
 package chain
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -76,69 +74,17 @@ func (c *Client) GetTokenBalance(tokenAddress, ownerAddress string) (*big.Int, e
 	return balance, nil
 }
 
-// SendTokenTransaction sends an ERC20 token transfer.
-func (c *Client) SendTokenTransaction(
-	from accounts.Account,
-	tokenAddress string,
-	to string,
-	amountBaseUnits *big.Int,
-	signFn func(accounts.Account, *types.Transaction, *big.Int) (*types.Transaction, error),
-) (string, error) {
-	ctx := context.Background()
+// PrepareTokenTransfer builds an unsigned ERC20 transfer transaction.
+func (c *Client) PrepareTokenTransfer(from common.Address, tokenAddress string, to string, amountBaseUnits *big.Int) (*types.Transaction, error) {
 	tokenAddr := common.HexToAddress(tokenAddress)
 	toAddr := common.HexToAddress(to)
 
 	data, err := erc20ABI.Pack("transfer", toAddr, amountBaseUnits)
 	if err != nil {
-		return "", fmt.Errorf("failed to encode token transfer: %w", err)
+		return nil, fmt.Errorf("failed to encode token transfer: %w", err)
 	}
 
-	nonce, err := c.EthClient.PendingNonceAt(ctx, from.Address)
-	if err != nil {
-		return "", fmt.Errorf("failed to get nonce: %w", err)
-	}
-
-	gasTipCap, err := c.EthClient.SuggestGasTipCap(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get gas tip cap: %w", err)
-	}
-
-	head, err := c.EthClient.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to get header: %w", err)
-	}
-
-	gasFeeCap := new(big.Int).Add(
-		new(big.Int).Mul(head.BaseFee, big.NewInt(2)),
-		gasTipCap,
-	)
-
-	gasLimit, err := c.EstimateGas(from.Address, tokenAddr, big.NewInt(0), data)
-	if err != nil {
-		gasLimit = 100000
-	}
-
-	tx := types.NewTx(&types.DynamicFeeTx{
-		ChainID:   c.ChainID,
-		Nonce:     nonce,
-		GasTipCap: gasTipCap,
-		GasFeeCap: gasFeeCap,
-		Gas:       gasLimit,
-		To:        &tokenAddr,
-		Value:     big.NewInt(0),
-		Data:      data,
-	})
-
-	signedTx, err := signFn(from, tx, c.ChainID)
-	if err != nil {
-		return "", fmt.Errorf("failed to sign transaction: %w", err)
-	}
-
-	if err := c.EthClient.SendTransaction(ctx, signedTx); err != nil {
-		return "", fmt.Errorf("failed to send transaction: %w", err)
-	}
-
-	return signedTx.Hash().Hex(), nil
+	return c.prepareDynamicFeeTx(from, tokenAddr, big.NewInt(0), data, 100000)
 }
 
 func (c *Client) callERC20(token common.Address, method string, args ...interface{}) ([]interface{}, error) {

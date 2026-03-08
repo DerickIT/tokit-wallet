@@ -46,6 +46,7 @@ var transferCmd = &cobra.Command{
 
 		symbol := client.Config.Symbol
 		amountBaseUnits := new(big.Int)
+		unsignedTx := &types.Transaction{}
 
 		if transferTokenAddress != "" {
 			metadata, err := client.GetTokenMetadata(transferTokenAddress)
@@ -58,23 +59,40 @@ var transferCmd = &cobra.Command{
 			}
 			amountBaseUnits = parsedAmount
 			symbol = metadata.Symbol
+			unsignedTx, err = client.PrepareTokenTransfer(fromAccount.Address, transferTokenAddress, toAddress, amountBaseUnits)
+			if err != nil {
+				utils.Log.Fatalf("Failed to prepare token transfer: %v", err)
+			}
 		} else {
 			parsedAmount, err := chain.ParseUnits(amountStr, 18)
 			if err != nil {
 				utils.Log.Fatalf("Invalid amount: %v", err)
 			}
 			amountBaseUnits = parsedAmount
+			unsignedTx, err = client.PrepareNativeTransfer(fromAccount.Address, toAddress, amountBaseUnits)
+			if err != nil {
+				utils.Log.Fatalf("Failed to prepare transfer: %v", err)
+			}
 		}
 
+		maxNetworkFee := estimateMaxNetworkFee(unsignedTx)
 		fmt.Printf("\nCONFIRM TRANSACTION\n")
-		fmt.Printf("Chain:  %s\n", chainName)
-		fmt.Printf("From:   %s\n", fromAccount.Address.Hex())
-		fmt.Printf("To:     %s\n", toAddress)
-		fmt.Printf("Amount: %s %s\n", amountStr, symbol)
+		fmt.Printf("Chain:            %s\n", chainName)
+		fmt.Printf("From:             %s\n", fromAccount.Address.Hex())
+		fmt.Printf("To:               %s\n", toAddress)
+		fmt.Printf("Amount:           %s %s\n", amountStr, symbol)
 		if transferTokenAddress != "" {
-			fmt.Printf("Token:  %s\n", transferTokenAddress)
+			fmt.Printf("Token:            %s\n", transferTokenAddress)
 		}
-		fmt.Println(strings.Repeat("-", 40))
+		fmt.Printf("Gas limit:        %d\n", unsignedTx.Gas())
+		fmt.Printf("Max fee per gas:  %s Gwei\n", chain.FormatUnits(unsignedTx.GasFeeCap(), 9, 4))
+		fmt.Printf("Priority fee:     %s Gwei\n", chain.FormatUnits(unsignedTx.GasTipCap(), 9, 4))
+		fmt.Printf("Max network fee:  %s %s\n", chain.FormatUnits(maxNetworkFee, 18, 6), client.Config.Symbol)
+		if transferTokenAddress == "" {
+			totalMaxCost := new(big.Int).Add(new(big.Int).Set(unsignedTx.Value()), maxNetworkFee)
+			fmt.Printf("Max total spend:  %s %s\n", chain.FormatUnits(totalMaxCost, 18, 6), client.Config.Symbol)
+		}
+		fmt.Println(strings.Repeat("-", 48))
 
 		fmt.Print("Enter password to confirm: ")
 		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
@@ -89,13 +107,7 @@ var transferCmd = &cobra.Command{
 		}
 
 		fmt.Println("\nSending transaction...")
-		var txHash string
-		if transferTokenAddress != "" {
-			txHash, err = client.SendTokenTransaction(fromAccount, transferTokenAddress, toAddress, amountBaseUnits, signFn)
-		} else {
-			txHash, err = client.SendTransaction(fromAccount, toAddress, amountBaseUnits, signFn)
-		}
-
+		txHash, err := client.SendPreparedTransaction(fromAccount, unsignedTx, signFn)
 		if err != nil {
 			utils.Log.Fatalf("Failed to send transaction: %v", err)
 		}
@@ -103,6 +115,10 @@ var transferCmd = &cobra.Command{
 		fmt.Printf("\nTransaction sent.\nHash: %s\n", txHash)
 		fmt.Printf("Explorer: %s/tx/%s\n", client.Config.Explorer, txHash)
 	},
+}
+
+func estimateMaxNetworkFee(tx *types.Transaction) *big.Int {
+	return new(big.Int).Mul(new(big.Int).SetUint64(tx.Gas()), tx.GasFeeCap())
 }
 
 func init() {
