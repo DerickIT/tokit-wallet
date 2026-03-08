@@ -6,6 +6,7 @@ import (
 	"strings"
 	"syscall"
 	"text/tabwriter"
+	"tokit/internal/config"
 	"tokit/internal/utils"
 	"tokit/internal/wallet"
 
@@ -28,7 +29,7 @@ var createCmd = &cobra.Command{
 			utils.Log.Fatalf("Failed to generate mnemonic: %v", err)
 		}
 
-		fmt.Println("⚠️  IMPORTANT: Write down this mnemonic phrase. It is the ONLY way to recover your funds!")
+		fmt.Println("Warning: write down this mnemonic phrase. It is the only way to recover your funds.")
 		fmt.Println(strings.Repeat("=", 60))
 		fmt.Println(mnemonic)
 		fmt.Println(strings.Repeat("=", 60))
@@ -61,7 +62,7 @@ var createCmd = &cobra.Command{
 			utils.Log.Fatalf("Failed to create account: %v", err)
 		}
 
-		fmt.Printf("\n✅ Wallet created successfully!\nAddress: %s\n", acc.Address.Hex())
+		fmt.Printf("\nWallet created successfully.\nAddress: %s\n", acc.Address.Hex())
 		fmt.Printf("Keystore location: %s\n", acc.URL.Path)
 	},
 }
@@ -83,10 +84,14 @@ var listCmd = &cobra.Command{
 
 		w := new(tabwriter.Writer)
 		w.Init(os.Stdout, 0, 8, 2, '\t', 0)
-		fmt.Fprintln(w, "Index\tAddress\tLocation")
+		fmt.Fprintln(w, "Index\tAddress\tDefault\tLocation")
 
 		for i, acc := range accounts {
-			fmt.Fprintf(w, "%d\t%s\t%s\n", i, acc.Address.Hex(), acc.URL.Path)
+			marker := ""
+			if AppConfig != nil && strings.EqualFold(acc.Address.Hex(), AppConfig.DefaultAccount) {
+				marker = "yes"
+			}
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", i, acc.Address.Hex(), marker, acc.URL.Path)
 		}
 		w.Flush()
 	},
@@ -119,11 +124,9 @@ var importCmd = &cobra.Command{
 		}
 
 		var acc accounts.Account
-		// Check if input is mnemonic (has spaces) or private key (hex)
 		if strings.Contains(input, " ") {
 			acc, err = svc.ImportMnemonic(input, password)
 		} else {
-			// Assume private key
 			input = strings.TrimPrefix(input, "0x")
 			acc, err = svc.ImportPrivateKey(input, password)
 		}
@@ -132,8 +135,32 @@ var importCmd = &cobra.Command{
 			utils.Log.Fatalf("Failed to import account: %v", err)
 		}
 
-		fmt.Printf("\n✅ Wallet imported successfully!\nAddress: %s\n", acc.Address.Hex())
+		fmt.Printf("\nWallet imported successfully.\nAddress: %s\n", acc.Address.Hex())
 		fmt.Printf("Keystore location: %s\n", acc.URL.Path)
+	},
+}
+
+var useCmd = &cobra.Command{
+	Use:   "use [address]",
+	Short: "Set the default local account",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		svc, err := wallet.NewService()
+		if err != nil {
+			utils.Log.Fatalf("Failed to init wallet service: %v", err)
+		}
+
+		acc, err := svc.GetAccount(args[0])
+		if err != nil {
+			utils.Log.Fatalf("Failed to select default account: %v", err)
+		}
+
+		if err := config.SaveDefaultAccount(acc.Address.Hex()); err != nil {
+			utils.Log.Fatalf("Failed to save default account: %v", err)
+		}
+
+		AppConfig.DefaultAccount = acc.Address.Hex()
+		fmt.Printf("Default account set to %s\n", acc.Address.Hex())
 	},
 }
 
@@ -142,4 +169,5 @@ func init() {
 	walletCmd.AddCommand(createCmd)
 	walletCmd.AddCommand(listCmd)
 	walletCmd.AddCommand(importCmd)
+	walletCmd.AddCommand(useCmd)
 }

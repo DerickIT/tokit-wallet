@@ -17,6 +17,7 @@ import (
 )
 
 var transferTokenAddress string
+var transferFromAddress string
 
 var transferCmd = &cobra.Command{
 	Use:   "transfer [chain] [to] [amount]",
@@ -27,27 +28,22 @@ var transferCmd = &cobra.Command{
 		toAddress := args[1]
 		amountStr := args[2]
 
-		// Parse amount
 		amount := new(big.Float)
 		_, ok := amount.SetString(amountStr)
 		if !ok {
 			utils.Log.Fatal("Invalid amount")
 		}
 
-		// Init Wallet Service
 		svc, err := wallet.NewService()
 		if err != nil {
 			utils.Log.Fatalf("Failed to init wallet service: %v", err)
 		}
 
-		// Get Sender Account (First one for now, or select via flag later)
-		accountsList := svc.ListAccounts()
-		if len(accountsList) == 0 {
+		fromAccount, err := resolveLocalAccount(svc, transferFromAddress)
+		if err != nil {
 			utils.Log.Fatal("No accounts found. Please create or import a wallet.")
 		}
-		fromAccount := accountsList[0]
 
-		// Init Chain Client
 		client, err := chain.NewClient(chainName, AppConfig)
 		if err != nil {
 			utils.Log.Fatalf("Failed to create client: %v", err)
@@ -59,8 +55,7 @@ var transferCmd = &cobra.Command{
 			symbol = "TOKEN"
 		}
 
-		// Confirm Transaction
-		fmt.Printf("\n⚠️  CONFIRM TRANSACTION\n")
+		fmt.Printf("\nCONFIRM TRANSACTION\n")
 		fmt.Printf("Chain:  %s\n", chainName)
 		fmt.Printf("From:   %s\n", fromAccount.Address.Hex())
 		fmt.Printf("To:     %s\n", toAddress)
@@ -78,12 +73,10 @@ var transferCmd = &cobra.Command{
 		password := string(bytePassword)
 		fmt.Println()
 
-		// Define Signer Function
 		signFn := func(a accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
 			return svc.SignTx(a, tx, chainID, password)
 		}
 
-		// Send Transaction
 		fmt.Println("\nSending transaction...")
 		var txHash string
 		if transferTokenAddress != "" {
@@ -96,7 +89,7 @@ var transferCmd = &cobra.Command{
 			utils.Log.Fatalf("Failed to send transaction: %v", err)
 		}
 
-		fmt.Printf("\n✅ Transaction Sent!\nHash: %s\n", txHash)
+		fmt.Printf("\nTransaction sent.\nHash: %s\n", txHash)
 		fmt.Printf("Explorer: %s/tx/%s\n", client.Config.Explorer, txHash)
 	},
 }
@@ -104,4 +97,5 @@ var transferCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(transferCmd)
 	transferCmd.Flags().StringVarP(&transferTokenAddress, "token", "t", "", "ERC20 token address")
+	transferCmd.Flags().StringVar(&transferFromAddress, "from", "", "Local account address to send from")
 }

@@ -9,8 +9,9 @@ import (
 )
 
 type Config struct {
-	Networks map[string]NetworkConfig `mapstructure:"networks"`
-	Default  string                   `mapstructure:"default_network"`
+	Networks       map[string]NetworkConfig `mapstructure:"networks"`
+	Default        string                   `mapstructure:"default_network"`
+	DefaultAccount string                   `mapstructure:"default_account"`
 }
 
 type NetworkConfig struct {
@@ -20,39 +21,76 @@ type NetworkConfig struct {
 	Explorer string `mapstructure:"explorer"`
 }
 
-// LoadConfig loads the configuration from file and environment variables
+// LoadConfig loads the configuration from file and environment variables.
 func LoadConfig() (*Config, error) {
-	home, err := os.UserHomeDir()
+	configPath, configFile, err := configLocation()
 	if err != nil {
 		return nil, err
 	}
 
-	configPath := filepath.Join(home, ".tokit")
-	configName := "config"
-	configFile := filepath.Join(configPath, configName+".yaml")
-
-	// Create default config if it doesn't exist
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		if err := createDefaultConfig(configPath, configFile); err != nil {
 			return nil, fmt.Errorf("failed to create default config: %w", err)
 		}
 	}
 
-	viper.AddConfigPath(configPath)
-	viper.SetConfigName(configName)
-	viper.SetConfigType("yaml")
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err != nil {
+	v := newViper(configPath)
+	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
+	if err := v.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	return &config, nil
+}
+
+// SaveDefaultAccount persists the preferred local account address.
+func SaveDefaultAccount(address string) error {
+	configPath, configFile, err := configLocation()
+	if err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		if err := createDefaultConfig(configPath, configFile); err != nil {
+			return fmt.Errorf("failed to create default config: %w", err)
+		}
+	}
+
+	v := newViper(configPath)
+	if err := v.ReadInConfig(); err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	v.Set("default_account", address)
+	if err := v.WriteConfig(); err != nil {
+		return fmt.Errorf("failed to update config file: %w", err)
+	}
+
+	return nil
+}
+
+func configLocation() (string, string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", "", err
+	}
+
+	configPath := filepath.Join(home, ".tokit")
+	configFile := filepath.Join(configPath, "config.yaml")
+	return configPath, configFile, nil
+}
+
+func newViper(configPath string) *viper.Viper {
+	v := viper.New()
+	v.AddConfigPath(configPath)
+	v.SetConfigName("config")
+	v.SetConfigType("yaml")
+	v.AutomaticEnv()
+	return v
 }
 
 func createDefaultConfig(path, file string) error {
@@ -60,26 +98,30 @@ func createDefaultConfig(path, file string) error {
 		return err
 	}
 
-	viper.SetDefault("default_network", "ethereum")
-	viper.SetDefault("networks.ethereum.rpc_url", "https://eth.llamarpc.com")
-	viper.SetDefault("networks.ethereum.chain_id", 1)
-	viper.SetDefault("networks.ethereum.symbol", "ETH")
-	viper.SetDefault("networks.ethereum.explorer", "https://etherscan.io")
+	v := viper.New()
+	v.SetConfigFile(file)
+	v.SetConfigType("yaml")
+	v.SetDefault("default_network", "ethereum")
+	v.SetDefault("default_account", "")
+	v.SetDefault("networks.ethereum.rpc_url", "https://eth.llamarpc.com")
+	v.SetDefault("networks.ethereum.chain_id", 1)
+	v.SetDefault("networks.ethereum.symbol", "ETH")
+	v.SetDefault("networks.ethereum.explorer", "https://etherscan.io")
 
-	viper.SetDefault("networks.arbitrum.rpc_url", "https://arb1.arbitrum.io/rpc")
-	viper.SetDefault("networks.arbitrum.chain_id", 42161)
-	viper.SetDefault("networks.arbitrum.symbol", "ETH")
-	viper.SetDefault("networks.arbitrum.explorer", "https://arbiscan.io")
+	v.SetDefault("networks.arbitrum.rpc_url", "https://arb1.arbitrum.io/rpc")
+	v.SetDefault("networks.arbitrum.chain_id", 42161)
+	v.SetDefault("networks.arbitrum.symbol", "ETH")
+	v.SetDefault("networks.arbitrum.explorer", "https://arbiscan.io")
 
-	viper.SetDefault("networks.optimism.rpc_url", "https://mainnet.optimism.io")
-	viper.SetDefault("networks.optimism.chain_id", 10)
-	viper.SetDefault("networks.optimism.symbol", "ETH")
-	viper.SetDefault("networks.optimism.explorer", "https://optimistic.etherscan.io")
+	v.SetDefault("networks.optimism.rpc_url", "https://mainnet.optimism.io")
+	v.SetDefault("networks.optimism.chain_id", 10)
+	v.SetDefault("networks.optimism.symbol", "ETH")
+	v.SetDefault("networks.optimism.explorer", "https://optimistic.etherscan.io")
 
-	viper.SetDefault("networks.base.rpc_url", "https://mainnet.base.org")
-	viper.SetDefault("networks.base.chain_id", 8453)
-	viper.SetDefault("networks.base.symbol", "ETH")
-	viper.SetDefault("networks.base.explorer", "https://basescan.org")
+	v.SetDefault("networks.base.rpc_url", "https://mainnet.base.org")
+	v.SetDefault("networks.base.chain_id", 8453)
+	v.SetDefault("networks.base.symbol", "ETH")
+	v.SetDefault("networks.base.explorer", "https://basescan.org")
 
-	return viper.WriteConfigAs(file)
+	return v.WriteConfigAs(file)
 }

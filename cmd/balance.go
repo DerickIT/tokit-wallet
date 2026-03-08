@@ -13,11 +13,12 @@ import (
 )
 
 var balanceTokenAddress string
+var balanceFromAddress string
 
 var balanceCmd = &cobra.Command{
 	Use:   "balance [chain] [address]",
 	Short: "Check account balance",
-	Long:  `Check the balance of an account on a specific blockchain. If address is omitted, checks the first local wallet account.`,
+	Long:  `Check the balance of an account on a specific blockchain. If address is omitted, checks the selected local wallet account.`,
 	Args:  cobra.RangeArgs(0, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		chainName := AppConfig.Default
@@ -29,16 +30,15 @@ var balanceCmd = &cobra.Command{
 		if len(args) > 1 {
 			address = args[1]
 		} else {
-			// Get first account from local wallet
 			svc, err := wallet.NewService()
 			if err != nil {
 				utils.Log.Fatalf("Failed to init wallet service: %v", err)
 			}
-			accounts := svc.ListAccounts()
-			if len(accounts) == 0 {
+			account, err := resolveLocalAccount(svc, balanceFromAddress)
+			if err != nil {
 				utils.Log.Fatal("No local accounts found. Please provide an address or create a wallet.")
 			}
-			address = accounts[0].Address.Hex()
+			address = account.Address.Hex()
 		}
 
 		client, err := chain.NewClient(chainName, AppConfig)
@@ -51,14 +51,12 @@ var balanceCmd = &cobra.Command{
 		var symbol string
 
 		if balanceTokenAddress != "" {
-			// Check Token Balance
 			balance, err = client.GetTokenBalance(balanceTokenAddress, address)
 			if err != nil {
 				utils.Log.Fatalf("Failed to get token balance: %v", err)
 			}
-			symbol = "TOKEN" // TODO: Fetch symbol from contract
+			symbol = "TOKEN"
 		} else {
-			// Check ETH Balance
 			balance, err = client.GetBalance(address)
 			if err != nil {
 				utils.Log.Fatalf("Failed to get balance: %v", err)
@@ -66,7 +64,6 @@ var balanceCmd = &cobra.Command{
 			symbol = client.Config.Symbol
 		}
 
-		// Convert Wei to Ether (assuming 18 decimals)
 		fBalance := new(big.Float)
 		fBalance.SetString(balance.String())
 		ethValue := new(big.Float).Quo(fBalance, big.NewFloat(1e18))
@@ -82,4 +79,5 @@ var balanceCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(balanceCmd)
 	balanceCmd.Flags().StringVarP(&balanceTokenAddress, "token", "t", "", "ERC20 token address")
+	balanceCmd.Flags().StringVar(&balanceFromAddress, "from", "", "Local account address to use when address is omitted")
 }
