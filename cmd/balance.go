@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"math/big"
 	"os"
 	"text/tabwriter"
 	"tokit/internal/chain"
@@ -47,31 +46,32 @@ var balanceCmd = &cobra.Command{
 		}
 		defer client.Close()
 
-		var balance *big.Int
-		var symbol string
+		displayBalance := "0"
+		symbol := client.Config.Symbol
 
 		if balanceTokenAddress != "" {
-			balance, err = client.GetTokenBalance(balanceTokenAddress, address)
+			metadata, err := client.GetTokenMetadata(balanceTokenAddress)
+			if err != nil {
+				utils.Log.Fatalf("Failed to get token metadata: %v", err)
+			}
+			balance, err := client.GetTokenBalance(balanceTokenAddress, address)
 			if err != nil {
 				utils.Log.Fatalf("Failed to get token balance: %v", err)
 			}
-			symbol = "TOKEN"
+			displayBalance = chain.FormatUnits(balance, metadata.Decimals, 6)
+			symbol = metadata.Symbol
 		} else {
-			balance, err = client.GetBalance(address)
+			balance, err := client.GetBalance(address)
 			if err != nil {
 				utils.Log.Fatalf("Failed to get balance: %v", err)
 			}
-			symbol = client.Config.Symbol
+			displayBalance = chain.FormatUnits(balance, 18, 6)
 		}
-
-		fBalance := new(big.Float)
-		fBalance.SetString(balance.String())
-		ethValue := new(big.Float).Quo(fBalance, big.NewFloat(1e18))
 
 		w := new(tabwriter.Writer)
 		w.Init(os.Stdout, 0, 8, 2, '\t', 0)
 		fmt.Fprintln(w, "Chain\tAddress\tBalance\tSymbol")
-		fmt.Fprintf(w, "%s\t%s\t%.6f\t%s\n", chainName, address, ethValue, symbol)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", chainName, address, displayBalance, symbol)
 		w.Flush()
 	},
 }

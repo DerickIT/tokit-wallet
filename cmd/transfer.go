@@ -28,12 +28,6 @@ var transferCmd = &cobra.Command{
 		toAddress := args[1]
 		amountStr := args[2]
 
-		amount := new(big.Float)
-		_, ok := amount.SetString(amountStr)
-		if !ok {
-			utils.Log.Fatal("Invalid amount")
-		}
-
 		svc, err := wallet.NewService()
 		if err != nil {
 			utils.Log.Fatalf("Failed to init wallet service: %v", err)
@@ -51,8 +45,25 @@ var transferCmd = &cobra.Command{
 		defer client.Close()
 
 		symbol := client.Config.Symbol
+		amountBaseUnits := new(big.Int)
+
 		if transferTokenAddress != "" {
-			symbol = "TOKEN"
+			metadata, err := client.GetTokenMetadata(transferTokenAddress)
+			if err != nil {
+				utils.Log.Fatalf("Failed to get token metadata: %v", err)
+			}
+			parsedAmount, err := chain.ParseUnits(amountStr, metadata.Decimals)
+			if err != nil {
+				utils.Log.Fatalf("Invalid token amount: %v", err)
+			}
+			amountBaseUnits = parsedAmount
+			symbol = metadata.Symbol
+		} else {
+			parsedAmount, err := chain.ParseUnits(amountStr, 18)
+			if err != nil {
+				utils.Log.Fatalf("Invalid amount: %v", err)
+			}
+			amountBaseUnits = parsedAmount
 		}
 
 		fmt.Printf("\nCONFIRM TRANSACTION\n")
@@ -80,9 +91,9 @@ var transferCmd = &cobra.Command{
 		fmt.Println("\nSending transaction...")
 		var txHash string
 		if transferTokenAddress != "" {
-			txHash, err = client.SendTokenTransaction(fromAccount, transferTokenAddress, toAddress, amount, signFn)
+			txHash, err = client.SendTokenTransaction(fromAccount, transferTokenAddress, toAddress, amountBaseUnits, signFn)
 		} else {
-			txHash, err = client.SendTransaction(fromAccount, toAddress, amount, signFn)
+			txHash, err = client.SendTransaction(fromAccount, toAddress, amountBaseUnits, signFn)
 		}
 
 		if err != nil {
