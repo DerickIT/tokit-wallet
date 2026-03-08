@@ -35,7 +35,7 @@ var transferCmd = &cobra.Command{
 
 		fromAccount, err := resolveLocalAccount(svc, transferFromAddress)
 		if err != nil {
-			utils.Log.Fatal("No accounts found. Please create or import a wallet.")
+			utils.Log.Fatalf("Failed to resolve local account: %v", err)
 		}
 
 		client, err := chain.NewClient(chainName, AppConfig)

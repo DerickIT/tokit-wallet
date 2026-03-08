@@ -35,7 +35,7 @@ var balanceCmd = &cobra.Command{
 			}
 			account, err := resolveLocalAccount(svc, balanceFromAddress)
 			if err != nil {
-				utils.Log.Fatal("No local accounts found. Please provide an address or create a wallet.")
+				utils.Log.Fatalf("Failed to resolve local account: %v", err)
 			}
 			address = account.Address.Hex()
 		}
